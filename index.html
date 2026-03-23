@@ -998,13 +998,55 @@ function showTrackMenu(trackId, playlistId) {
     <div class="modal-handle"></div>
     <div class="modal-title">${esc(track.title)}</div>
     <button class="modal-btn modal-btn-primary" onclick="closeModal();showAddToPlaylistModal('${trackId}')">Ajouter à une playlist</button>
-    <button class="modal-btn" style="background:var(--bg3)" onclick="closeModal();toggleFav('${trackId}')">${isFav ? 'Retirer des favoris' : 'Ajouter aux favoris'}</button>`;
+    <button class="modal-btn" style="background:var(--bg3)" onclick="closeModal();toggleFav('${trackId}')">${isFav ? 'Retirer des favoris' : 'Ajouter aux favoris'}</button>
+    <button class="modal-btn" style="background:var(--bg3)" onclick="closeModal();showEditTrackModal('${trackId}')">Modifier les infos</button>`;
   if (playlistId) {
     html += `<button class="modal-btn modal-btn-danger" onclick="removeTrackFromPlaylist('${trackId}','${playlistId}')">Retirer de la playlist</button>`;
   }
   html += `<button class="modal-btn modal-btn-danger" onclick="confirmDeleteTrack('${trackId}')">Supprimer le morceau</button>
     <button class="modal-btn modal-btn-cancel" onclick="closeModal()">Annuler</button>`;
   showModal(html);
+}
+
+function showEditTrackModal(trackId) {
+  const track = tracks.find(t => t.id === trackId);
+  if (!track) return;
+  showModal(`
+    <div class="modal-handle"></div>
+    <div class="modal-title">Modifier les infos</div>
+    <label style="display:block;font-size:13px;color:var(--text2);margin-bottom:6px">Titre</label>
+    <input class="modal-input" id="editTitle" value="${esc(track.title)}" placeholder="Titre">
+    <label style="display:block;font-size:13px;color:var(--text2);margin-bottom:6px">Artiste</label>
+    <input class="modal-input" id="editArtist" value="${esc(track.artist)}" placeholder="Artiste">
+    <button class="modal-btn modal-btn-primary" onclick="saveTrackEdit('${trackId}')">Enregistrer</button>
+    <button class="modal-btn modal-btn-cancel" onclick="closeModal()">Annuler</button>
+  `);
+  setTimeout(() => document.getElementById('editTitle')?.focus(), 100);
+}
+
+async function saveTrackEdit(trackId) {
+  const title = document.getElementById('editTitle')?.value?.trim();
+  const artist = document.getElementById('editArtist')?.value?.trim();
+  if (!title) return;
+  const track = tracks.find(t => t.id === trackId);
+  if (!track) return;
+  track.title = title;
+  track.artist = artist || 'Artiste inconnu';
+  // Update in IndexedDB (preserve the blob)
+  const data = await dbGet('tracks', trackId);
+  if (data) {
+    data.title = track.title;
+    data.artist = track.artist;
+    await dbPut('tracks', data);
+  }
+  // Update mini-player / full player if this is the current track
+  if (currentTrack && currentTrack.id === trackId) {
+    currentTrack.title = track.title;
+    currentTrack.artist = track.artist;
+    updatePlayerUI();
+  }
+  closeModal();
+  renderCurrentTab();
 }
 
 function confirmDeleteTrack(trackId) {
